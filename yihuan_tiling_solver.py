@@ -53,6 +53,8 @@ THEMES = {
     },
 }
 
+REST_4_TYPE_QUICK_SELECT_IDS = {"4-1", "4-13", "4-14", "4-16"}
+
 COLORS = {
     "empty": "#f7f7f7",
     "blocked": "#151515",
@@ -447,13 +449,17 @@ class App(tk.Tk):
         ttk.Radiobutton(rest_header, text="填滿，自動補 2/3/4", value="full", variable=self.fill_mode).grid(row=0, column=3, columnspan=2, sticky="w", padx=(12, 0))
         ttk.Radiobutton(rest_header, text="可空 1 格，只用勾選型", value="allow_one_empty", variable=self.fill_mode).grid(row=0, column=5, columnspan=3, sticky="w", padx=(12, 0))
         for i, size in enumerate((2, 3, 4)):
-            ttk.Button(rest_header, text=f"{size} 型全選", command=lambda s=size: self.select_rest_size(s)).grid(row=1, column=i, padx=(0, 6), pady=(4, 0))
+            text = "4 型全選（4 種）" if size == 4 else f"{size} 型全選"
+            ttk.Button(rest_header, text=text, command=lambda s=size: self.select_rest_size(s)).grid(row=1, column=i, padx=(0, 6), pady=(4, 0))
         ttk.Button(rest_header, text="清空", command=self.clear_rest_shapes).grid(row=1, column=3, padx=(0, 6), pady=(4, 0))
         ttk.Button(rest_header, text="全選全部", command=self.select_all_rest_shapes).grid(row=1, column=4, pady=(4, 0))
+        self.rest_selection_note = ttk.Label(rest_header, text="")
+        self.rest_selection_note.grid(row=2, column=0, columnspan=7, sticky="w", pady=(4, 0))
 
         self.rest_shape_frame = ttk.Frame(rest_box)
         self.rest_shape_frame.grid(row=1, column=0, sticky="w")
         self._draw_rest_shape_selectors()
+        self.update_rest_selection_note()
 
         action_box = ttk.LabelFrame(right, text="求解")
         action_box.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(8, 0))
@@ -725,6 +731,7 @@ class App(tk.Tk):
             if col >= 7:
                 col = 0
                 row += 1
+        self.update_rest_selection_note()
 
     def create_shape_tile(self, parent, shape_id, shape, selected=False, width=72, height=84):
         bg = self.palette["tile_selected"] if selected else self.palette["tile"]
@@ -887,7 +894,13 @@ class App(tk.Tk):
 
     def select_rest_size(self, size):
         for shape_size, shape_id, _ in self.shape_cells:
-            if shape_size == size:
+            if shape_size != size:
+                continue
+            if not self.is_allowed_supplement_shape(shape_size, shape_id):
+                continue
+            if size == 4:
+                self.rest_shape_vars[shape_id].set(shape_id in REST_4_TYPE_QUICK_SELECT_IDS)
+            else:
                 self.rest_shape_vars[shape_id].set(True)
         self._draw_rest_shape_selectors()
 
@@ -900,6 +913,26 @@ class App(tk.Tk):
         for var in self.rest_shape_vars.values():
             var.set(False)
         self._draw_rest_shape_selectors()
+
+    def update_rest_selection_note(self):
+        if not hasattr(self, "rest_selection_note"):
+            return
+        selected_4 = sorted(
+            shape_id
+            for shape_id, var in self.rest_shape_vars.items()
+            if shape_id.startswith("4-") and var.get()
+        )
+        quick_4 = sorted(REST_4_TYPE_QUICK_SELECT_IDS)
+        if selected_4 == quick_4:
+            text = "4 型全選只包含：4-1、4-13、4-14、4-16"
+        elif selected_4:
+            text = "目前已選 4 型：" + "、".join(selected_4)
+        else:
+            text = "目前未選 4 型"
+        self.rest_selection_note.config(text=text)
+
+    def is_allowed_supplement_shape(self, shape_size, shape_id):
+        return shape_size != 4 or shape_id in REST_4_TYPE_QUICK_SELECT_IDS
 
     def reset_board(self):
         self.rows.set(max(1, min(MAX_GRID, int(self.rows.get()))))
@@ -1058,7 +1091,19 @@ class App(tk.Tk):
         if not selected:
             return selected
 
-        return self.shapes_for_sizes(self.fill_size_plan_sizes())
+        plan_sizes = self.fill_size_plan_sizes()
+        selected_sizes = {len(shape) for _, shape in selected}
+        enabled = list(selected)
+        selected_ids = {shape_id for shape_id, _ in enabled}
+        for shape_size, shape_id, shape in self.shape_cells:
+            if shape_size not in plan_sizes or shape_size in selected_sizes:
+                continue
+            if not self.is_allowed_supplement_shape(shape_size, shape_id):
+                continue
+            if shape_id not in selected_ids:
+                enabled.append((shape_id, shape))
+                selected_ids.add(shape_id)
+        return enabled
 
     def shapes_for_sizes(self, sizes):
         return [
