@@ -29,11 +29,15 @@ python yihuan_tiling_solver.py
 
 ### Windows exe
 
-也可以直接執行：
+Windows 版執行檔會放在 GitHub Releases，不直接放在 repository 裡。
+
+下載 Release 附件後可直接執行：
 
 ```text
 yihuan_tiling_solver.exe
 ```
+
+如果要自行重新打包，可使用 repository 內的 `yihuan_tiling_solver.spec` 搭配 PyInstaller。
 
 ## 預設固定方塊
 
