@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "rows": 5,
+  "cols": 5,
+  "board": [
+    [
+      "empty",
+      "empty",
+      "empty",
+      "empty",
+      "blocked"
+    ],
+    [
+      "empty",
+      "empty",
+      "empty",
+      "empty",
+      "blocked"
+    ],
+    [
+      "empty",
+      "empty",
+      "blocked",
+      "empty",
+      "empty"
+    ],
+    [
+      "blocked",
+      "empty",
+      "empty",
+      "empty",
+      "empty"
+    ],
+    [
+      "blocked",
+      "empty",
+      "empty",
+      "empty",
+      "empty"
+    ]
+  ],
+  "fixed_pieces": [
+    {
+      "label": "固定1",
+      "mark": "A",
+      "shape_id": "2-1",
+      "cells": []
+    },
+    {
+      "label": "固定2",
+      "mark": "B",
+      "shape_id": "2-2",
+      "cells": []
+    },
+    {
+      "label": "固定3",
+      "mark": "C",
+      "shape_id": "4-1",
+      "cells": []
+    },
+    {
+      "label": "固定4",
+      "mark": "D",
+      "shape_id": "4-14",
+      "cells": []
+    }
+  ],
+  "rest_shape_ids": [
+    "2-1",
+    "2-2"
+  ],
+  "active_preset_id": "tiny_big_adventure",
+  "fill_mode": "full",
+  "auto_fill_supplement_types": true,
+  "max_solutions": 500,
+  "allow_rotation": false,
+  "allow_reflection": false
+}
