@@ -169,6 +169,7 @@ class TilingSolver:
         max_solutions,
         max_empty_cells=0,
         rest_size_limits=None,
+        dedupe_by_piece_set=True,
     ):
         self.rows = rows
         self.cols = cols
@@ -181,6 +182,7 @@ class TilingSolver:
         self.max_solutions = max_solutions
         self.max_empty_cells = max_empty_cells
         self.rest_size_limits = rest_size_limits
+        self.dedupe_by_piece_set = dedupe_by_piece_set
         self.solutions = []
         self.solution_keys = set()
         self.candidates_by_cell = {}
@@ -303,12 +305,21 @@ class TilingSolver:
                 return
 
     def solution_key(self, placed, empty_cells):
+        if self.dedupe_by_piece_set:
+            parts = [self.normalized_solution_shape_id(shape_id) for shape_id, _ in self.fixed_placed_shapes]
+            parts.extend(self.normalized_solution_shape_id(shape_id) for _, shape_id, _ in placed)
+            parts.extend("空格" for _ in empty_cells)
+            return tuple(sorted(parts))
+
         parts = [(len(cells), tuple(sorted(cells))) for _, cells in self.fixed_placed_shapes]
         for _, _, cells in placed:
             parts.append((len(cells), tuple(sorted(cells))))
         for cell in empty_cells:
             parts.append((0, (cell,)))
         return tuple(sorted(parts))
+
+    def normalized_solution_shape_id(self, shape_id):
+        return shape_id.split(":", 1)[1] if ":" in shape_id else shape_id
 
 
 class App(tk.Tk):
@@ -325,6 +336,7 @@ class App(tk.Tk):
         self.allow_rotation = tk.BooleanVar(value=False)
         self.allow_reflection = tk.BooleanVar(value=False)
         self.fill_mode = tk.StringVar(value="full")
+        self.dedupe_by_piece_set = tk.BooleanVar(value=True)
         self.theme_name = tk.StringVar(value="light")
         self.max_solutions = tk.IntVar(value=500)
         self.solution_index = tk.IntVar(value=0)
@@ -468,9 +480,14 @@ class App(tk.Tk):
         self.max_solutions_spinbox.grid(row=0, column=1)
         ttk.Button(action_box, text="尋找所有可能", command=self.run_solver).grid(row=0, column=2, padx=6)
         ttk.Button(action_box, text="匯出解答 JSON", command=self.export_json).grid(row=0, column=3)
+        ttk.Checkbutton(
+            action_box,
+            text="只看使用方塊去重",
+            variable=self.dedupe_by_piece_set,
+        ).grid(row=0, column=4, padx=(10, 0), sticky="w")
 
         result_bar = ttk.Frame(action_box)
-        result_bar.grid(row=1, column=0, columnspan=4, sticky="ew", pady=(8, 0))
+        result_bar.grid(row=1, column=0, columnspan=5, sticky="ew", pady=(8, 0))
         ttk.Button(result_bar, text="上一個", command=lambda: self.move_solution(-1)).grid(row=0, column=0)
         ttk.Button(result_bar, text="下一個", command=lambda: self.move_solution(1)).grid(row=0, column=1)
         self.status = ttk.Label(result_bar, text="尚未求解")
@@ -511,6 +528,7 @@ class App(tk.Tk):
             self.style.configure("TButton", padding=(10, 5), background=self.palette["tile"], foreground=self.palette["text"])
             self.style.map("TButton", background=[("active", self.palette["tile_selected"])])
             self.style.configure("TRadiobutton", background=self.palette["bg"], foreground=self.palette["text"])
+            self.style.configure("TCheckbutton", background=self.palette["bg"], foreground=self.palette["text"])
             self.style.configure(
                 "TSpinbox",
                 fieldbackground=self.palette["text_area"],
@@ -1220,7 +1238,7 @@ class App(tk.Tk):
             if slot["shape_id"] and not slot["cells"]
         ]
         fixed_placed_shapes = [
-            (len(slot["shape"]), frozenset(slot["cells"]))
+            (slot["shape_id"], frozenset(slot["cells"]))
             for slot in self.fixed_slots
             if slot["shape_id"] and slot["cells"]
         ]
@@ -1254,6 +1272,7 @@ class App(tk.Tk):
             int(self.max_solutions.get()),
             max_empty_cells,
             rest_size_limits,
+            self.dedupe_by_piece_set.get(),
         )
         self.solutions = solver.solve()
         self.solution_index.set(0)
