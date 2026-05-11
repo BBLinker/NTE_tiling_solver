@@ -18,6 +18,39 @@ PALETTE = {
     "tile_selected": "#dbeafe",
     "tile_border": "#9fb3c8",
     "tile_selected_border": "#2563eb",
+    "board_bg": "#d8dee7",
+    "text_area": "#f8fafc",
+    "empty": "#f7f7f7",
+    "grid": "#777777",
+    "solution_text": "#111111",
+    "piece_fill": "#ffbd5a",
+    "piece_outline": "#4a2b00",
+    "danger": "#b91c1c",
+}
+
+THEMES = {
+    "light": PALETTE,
+    "dark": {
+        "bg": "#151a21",
+        "panel": "#1f2933",
+        "panel_border": "#05070a",
+        "text": "#e5edf5",
+        "muted": "#9aa8b7",
+        "accent": "#60a5fa",
+        "accent_soft": "#1d3b5f",
+        "tile": "#202a35",
+        "tile_selected": "#17375e",
+        "tile_border": "#05070a",
+        "tile_selected_border": "#60a5fa",
+        "board_bg": "#111827",
+        "text_area": "#0f1720",
+        "empty": "#d6dce3",
+        "grid": "#05070a",
+        "solution_text": "#0b1220",
+        "piece_fill": "#f6b352",
+        "piece_outline": "#2a1a00",
+        "danger": "#f87171",
+    },
 }
 
 COLORS = {
@@ -290,6 +323,7 @@ class App(tk.Tk):
         self.allow_rotation = tk.BooleanVar(value=False)
         self.allow_reflection = tk.BooleanVar(value=False)
         self.fill_mode = tk.StringVar(value="full")
+        self.theme_name = tk.StringVar(value="light")
         self.max_solutions = tk.IntVar(value=500)
         self.solution_index = tk.IntVar(value=0)
         self.active_preset_id = tk.StringVar(value="")
@@ -305,6 +339,7 @@ class App(tk.Tk):
         self.dragging_fixed_from_library = False
         self.preset_buttons = {}
         self.suppress_preset_clear = False
+        self.palette = THEMES["light"]
 
         self._build_shapes()
         self.fixed_slots = [self.make_fixed_slot(i) for i in range(4)]
@@ -337,22 +372,17 @@ class App(tk.Tk):
                 self.size_by_shape_id[shape_id] = size
 
     def _build_ui(self):
-        self.configure(bg=PALETTE["bg"])
         style = ttk.Style(self)
         style.theme_use("clam")
-        style.configure(".", font=("Microsoft JhengHei UI", 10), background=PALETTE["bg"], foreground=PALETTE["text"])
-        style.configure("TFrame", background=PALETTE["bg"])
-        style.configure("TLabelframe", background=PALETTE["bg"], bordercolor=PALETTE["panel_border"])
-        style.configure("TLabelframe.Label", background=PALETTE["bg"], foreground=PALETTE["text"], font=("Microsoft JhengHei UI", 10, "bold"))
-        style.configure("TLabel", background=PALETTE["bg"], foreground=PALETTE["text"])
-        style.configure("TButton", padding=(10, 5))
-        style.configure("TRadiobutton", background=PALETTE["bg"], foreground=PALETTE["text"])
+        self.style = style
+        self.apply_theme(redraw=False)
 
         root = ttk.Frame(self, padding=10)
         root.grid(row=0, column=0)
 
         title = ttk.Label(root, text="異環方塊盤面求解器", font=("Microsoft JhengHei UI", 16, "bold"))
         title.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
+        ttk.Button(root, text="日/夜模式", command=self.toggle_theme).grid(row=0, column=1, sticky="e", pady=(0, 10))
 
         left = ttk.Frame(root)
         left.grid(row=1, column=0, sticky="n")
@@ -362,9 +392,11 @@ class App(tk.Tk):
         board_bar = ttk.LabelFrame(left, text="盤面")
         board_bar.grid(row=0, column=0, sticky="ew")
         ttk.Label(board_bar, text="列").grid(row=0, column=0)
-        ttk.Spinbox(board_bar, from_=1, to=MAX_GRID, width=4, textvariable=self.rows).grid(row=0, column=1)
+        self.rows_spinbox = ttk.Spinbox(board_bar, from_=1, to=MAX_GRID, width=4, textvariable=self.rows)
+        self.rows_spinbox.grid(row=0, column=1)
         ttk.Label(board_bar, text="欄").grid(row=0, column=2)
-        ttk.Spinbox(board_bar, from_=1, to=MAX_GRID, width=4, textvariable=self.cols).grid(row=0, column=3)
+        self.cols_spinbox = ttk.Spinbox(board_bar, from_=1, to=MAX_GRID, width=4, textvariable=self.cols)
+        self.cols_spinbox.grid(row=0, column=3)
         ttk.Button(board_bar, text="套用尺寸", command=self.reset_board).grid(row=0, column=4, padx=6)
         ttk.Button(board_bar, text="清空", command=self.clear_board).grid(row=0, column=5)
         ttk.Button(board_bar, text="匯入完整設定", command=self.import_config).grid(row=0, column=6, padx=(6, 0))
@@ -373,7 +405,7 @@ class App(tk.Tk):
         board_view = ttk.Frame(left)
         board_view.grid(row=1, column=0, sticky="nsew", pady=14)
         board_view.grid_columnconfigure(0, weight=1)
-        self.canvas = tk.Canvas(board_view, width=self.cols.get() * CELL, height=self.rows.get() * CELL, bg="#d8dee7", highlightthickness=0)
+        self.canvas = tk.Canvas(board_view, width=self.cols.get() * CELL, height=self.rows.get() * CELL, bg=self.palette["board_bg"], highlightthickness=0)
         self.canvas.grid(row=0, column=0, sticky="n", pady=(8, 10))
         self.canvas.bind("<Button-1>", self.start_canvas_drag)
         self.canvas.bind("<B1-Motion>", self.drag_on_canvas)
@@ -426,7 +458,8 @@ class App(tk.Tk):
         action_box = ttk.LabelFrame(right, text="求解")
         action_box.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(8, 0))
         ttk.Label(action_box, text="最多輸出").grid(row=0, column=0)
-        ttk.Spinbox(action_box, from_=1, to=100000, width=8, textvariable=self.max_solutions).grid(row=0, column=1)
+        self.max_solutions_spinbox = ttk.Spinbox(action_box, from_=1, to=100000, width=8, textvariable=self.max_solutions)
+        self.max_solutions_spinbox.grid(row=0, column=1)
         ttk.Button(action_box, text="尋找所有可能", command=self.run_solver).grid(row=0, column=2, padx=6)
         ttk.Button(action_box, text="匯出解答 JSON", command=self.export_json).grid(row=0, column=3)
 
@@ -442,14 +475,73 @@ class App(tk.Tk):
             width=112,
             height=12,
             wrap="none",
-            bg="#f8fafc",
-            fg=PALETTE["text"],
-            insertbackground=PALETTE["text"],
+            bg=self.palette["text_area"],
+            fg=self.palette["text"],
+            insertbackground=self.palette["text"],
             relief="solid",
             bd=1,
         )
         self.result_text.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 0))
         self.update_fixed_status()
+
+    def toggle_theme(self):
+        self.theme_name.set("dark" if self.theme_name.get() == "light" else "light")
+        self.apply_theme(redraw=True)
+
+    def apply_theme(self, redraw=True):
+        self.palette = THEMES.get(self.theme_name.get(), THEMES["light"])
+        self.configure(bg=self.palette["bg"])
+        if hasattr(self, "style"):
+            self.style.configure(".", font=("Microsoft JhengHei UI", 10), background=self.palette["bg"], foreground=self.palette["text"])
+            self.style.configure("TFrame", background=self.palette["bg"])
+            self.style.configure("TLabelframe", background=self.palette["bg"], bordercolor=self.palette["panel_border"])
+            self.style.configure(
+                "TLabelframe.Label",
+                background=self.palette["bg"],
+                foreground=self.palette["text"],
+                font=("Microsoft JhengHei UI", 10, "bold"),
+            )
+            self.style.configure("TLabel", background=self.palette["bg"], foreground=self.palette["text"])
+            self.style.configure("TButton", padding=(10, 5), background=self.palette["tile"], foreground=self.palette["text"])
+            self.style.map("TButton", background=[("active", self.palette["tile_selected"])])
+            self.style.configure("TRadiobutton", background=self.palette["bg"], foreground=self.palette["text"])
+            self.style.configure(
+                "TSpinbox",
+                fieldbackground=self.palette["text_area"],
+                background=self.palette["tile"],
+                foreground=self.palette["text"],
+                arrowcolor=self.palette["text"],
+                bordercolor=self.palette["panel_border"],
+                lightcolor=self.palette["panel_border"],
+                darkcolor=self.palette["panel_border"],
+                insertcolor=self.palette["text"],
+            )
+            self.style.map(
+                "TSpinbox",
+                fieldbackground=[("readonly", self.palette["text_area"]), ("focus", self.palette["text_area"]), ("!disabled", self.palette["text_area"])],
+                foreground=[("readonly", self.palette["text"]), ("focus", self.palette["text"]), ("!disabled", self.palette["text"])],
+                background=[("readonly", self.palette["tile"]), ("focus", self.palette["tile"]), ("!disabled", self.palette["tile"])],
+                arrowcolor=[("readonly", self.palette["text"]), ("focus", self.palette["text"]), ("!disabled", self.palette["text"])],
+            )
+        if hasattr(self, "canvas"):
+            self.canvas.config(bg=self.palette["board_bg"])
+        if hasattr(self, "result_text"):
+            self.result_text.config(bg=self.palette["text_area"], fg=self.palette["text"], insertbackground=self.palette["text"])
+        for spinbox_name in ("rows_spinbox", "cols_spinbox", "max_solutions_spinbox"):
+            if hasattr(self, spinbox_name):
+                spinbox = getattr(self, spinbox_name)
+                spinbox.configure(foreground=self.palette["text"])
+                try:
+                    spinbox.configure(background=self.palette["text_area"])
+                except tk.TclError:
+                    pass
+        if redraw:
+            self.redraw_fixed_slot_buttons()
+            self.redraw_preset_buttons()
+            self._draw_fixed_shape_library()
+            self._draw_rest_shape_selectors()
+            self.draw_board()
+            self.update_fixed_status()
 
     def redraw_preset_buttons(self):
         for child in self.preset_frame.winfo_children():
@@ -460,8 +552,8 @@ class App(tk.Tk):
             col = index % 2
             selected = self.active_preset_id.get() == preset["id"]
             text = f"{index + 1}. {preset['name']}\n{preset['en']}"
-            bg = PALETTE["tile_selected"] if selected else PALETTE["tile"]
-            border = PALETTE["tile_selected_border"] if selected else PALETTE["tile_border"]
+            bg = self.palette["tile_selected"] if selected else self.palette["tile"]
+            border = self.palette["tile_selected_border"] if selected else self.palette["tile_border"]
             btn = tk.Label(
                 self.preset_frame,
                 text=text,
@@ -472,7 +564,7 @@ class App(tk.Tk):
                 width=28,
                 cursor="hand2",
                 bg=bg,
-                fg=PALETTE["text"],
+                fg=self.palette["text"],
                 relief="solid",
                 bd=2 if selected else 1,
                 highlightthickness=1,
@@ -635,24 +727,24 @@ class App(tk.Tk):
                 row += 1
 
     def create_shape_tile(self, parent, shape_id, shape, selected=False, width=72, height=84):
-        bg = PALETTE["tile_selected"] if selected else PALETTE["tile"]
-        border = PALETTE["tile_selected_border"] if selected else PALETTE["tile_border"]
+        bg = self.palette["tile_selected"] if selected else self.palette["tile"]
+        border = self.palette["tile_selected_border"] if selected else self.palette["tile_border"]
         canvas = tk.Canvas(parent, width=width, height=height, bg=bg, highlightthickness=0, cursor="hand2")
         canvas.create_rectangle(2, 2, width - 2, height - 2, fill=bg, outline=border, width=3 if selected else 1)
-        canvas.create_text(width / 2, 14, text=shape_id, fill=PALETTE["text"], font=("Microsoft JhengHei UI", 9, "bold"))
+        canvas.create_text(width / 2, 14, text=shape_id, fill=self.palette["text"], font=("Microsoft JhengHei UI", 9, "bold"))
         self._draw_mini_shape(canvas, shape, top=24)
         if selected:
-            canvas.create_rectangle(7, height - 10, width - 7, height - 5, fill=PALETTE["accent"], outline="")
+            canvas.create_rectangle(7, height - 10, width - 7, height - 5, fill=self.palette["accent"], outline="")
         return canvas
 
     def create_text_tile(self, parent, text, selected=False, width=72, height=84):
-        bg = PALETTE["tile_selected"] if selected else PALETTE["tile"]
-        border = PALETTE["tile_selected_border"] if selected else PALETTE["tile_border"]
+        bg = self.palette["tile_selected"] if selected else self.palette["tile"]
+        border = self.palette["tile_selected_border"] if selected else self.palette["tile_border"]
         canvas = tk.Canvas(parent, width=width, height=height, bg=bg, highlightthickness=0, cursor="hand2")
         canvas.create_rectangle(2, 2, width - 2, height - 2, fill=bg, outline=border, width=3 if selected else 1)
-        canvas.create_text(width / 2, height / 2, text=text, fill=PALETTE["muted"], font=("Microsoft JhengHei UI", 11, "bold"))
+        canvas.create_text(width / 2, height / 2, text=text, fill=self.palette["muted"], font=("Microsoft JhengHei UI", 11, "bold"))
         if selected:
-            canvas.create_rectangle(7, height - 10, width - 7, height - 5, fill=PALETTE["accent"], outline="")
+            canvas.create_rectangle(7, height - 10, width - 7, height - 5, fill=self.palette["accent"], outline="")
         return canvas
 
     def _draw_mini_shape(self, canvas, shape, top=6):
@@ -669,8 +761,8 @@ class App(tk.Tk):
                 oy + r * size,
                 ox + (c + 1) * size,
                 oy + (r + 1) * size,
-                fill="#ffbd5a",
-                outline="#4a2b00",
+                fill=self.palette["piece_fill"],
+                outline=self.palette["piece_outline"],
                 width=2,
             )
 
@@ -767,30 +859,30 @@ class App(tk.Tk):
             selected = i == self.fixed_slot.get()
             self.fixed_slot_buttons[i].config(
                 text=f"{item['label']} {shape_text} {place_text}",
-                bg=PALETTE["accent_soft"] if selected else PALETTE["tile"],
-                fg=PALETTE["text"],
+                bg=self.palette["accent_soft"] if selected else self.palette["tile"],
+                fg=self.palette["text"],
                 relief="solid",
                 bd=2 if selected else 1,
                 highlightthickness=1,
-                highlightbackground=PALETTE["tile_selected_border"] if selected else PALETTE["tile_border"],
+                highlightbackground=self.palette["tile_selected_border"] if selected else self.palette["tile_border"],
             )
         if self.plus_fixed_button:
             self.plus_fixed_button.config(
-                bg=PALETTE["tile"],
-                fg=PALETTE["accent"],
+                bg=self.palette["tile"],
+                fg=self.palette["accent"],
                 relief="solid",
                 bd=1,
                 highlightthickness=1,
-                highlightbackground=PALETTE["tile_border"],
+                highlightbackground=self.palette["tile_border"],
             )
         if self.minus_fixed_button:
             self.minus_fixed_button.config(
-                bg=PALETTE["tile"],
-                fg="#b91c1c",
+                bg=self.palette["tile"],
+                fg=self.palette["danger"],
                 relief="solid",
                 bd=1,
                 highlightthickness=1,
-                highlightbackground=PALETTE["tile_border"],
+                highlightbackground=self.palette["tile_border"],
             )
 
     def select_rest_size(self, size):
@@ -919,8 +1011,8 @@ class App(tk.Tk):
         for r in range(rows):
             for c in range(cols):
                 state = self.board[r][c]
-                color = self.color_for_mark(state) if self.is_fixed_mark(state) else COLORS.get(state, "#ffffff")
-                self.canvas.create_rectangle(c * CELL, r * CELL, (c + 1) * CELL, (r + 1) * CELL, fill=color, outline="#777777")
+                color = self.color_for_mark(state) if self.is_fixed_mark(state) else self.palette["empty"] if state == "empty" else COLORS.get(state, "#ffffff")
+                self.canvas.create_rectangle(c * CELL, r * CELL, (c + 1) * CELL, (r + 1) * CELL, fill=color, outline=self.palette["grid"])
                 if self.is_fixed_mark(state):
                     self.canvas.create_text(c * CELL + CELL / 2, r * CELL + CELL / 2, text=state, fill="white", font=("Arial", 16, "bold"))
 
@@ -932,15 +1024,15 @@ class App(tk.Tk):
                     text = mark.replace("固定", "固")
                     text_color = "white"
                 elif kind == "empty":
-                    color = "#ffffff"
+                    color = self.palette["empty"]
                     text = "空"
-                    text_color = PALETTE["muted"]
+                    text_color = self.palette["muted"]
                 else:
                     color = SOLUTION_COLORS[i % len(SOLUTION_COLORS)]
                     text = str(i + 1)
-                    text_color = "#111111"
+                    text_color = self.palette["solution_text"]
                 for r, c in cells:
-                    options = {"fill": color, "outline": "#333333", "width": 2}
+                    options = {"fill": color, "outline": self.palette["piece_outline"], "width": 2}
                     if kind == "empty":
                         options["dash"] = (4, 3)
                     self.canvas.create_rectangle(c * CELL + 3, r * CELL + 3, (c + 1) * CELL - 3, (r + 1) * CELL - 3, **options)
@@ -1269,6 +1361,7 @@ class App(tk.Tk):
         self._draw_fixed_shape_library()
         self._draw_rest_shape_selectors()
         self.redraw_preset_buttons()
+        self.apply_theme(redraw=False)
         self.draw_board()
         self.update_fixed_status()
         self.update_result_text()
